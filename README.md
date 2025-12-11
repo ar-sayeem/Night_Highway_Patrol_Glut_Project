@@ -30,10 +30,10 @@
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/ar-sayeem/Night_Highway_Patrol_Glut_Project.git
+git clone https://github.com/ar-sayeem/Night_Highway_Patrol_Glut_Project_VSCode.git
 
 # 2. Open in VS Code
-code Night_Highway_Patrol_Glut_Project
+code Night_Highway_Patrol_Glut_Project_VSCode
 
 # 3. Build & Run
 Ctrl+Shift+B  # Build
@@ -68,7 +68,7 @@ pacman -S mingw-w64-x86_64-gdb
 ## 📁 Project Structure
 
 ```
-📦 Night_Highway_Patrol_Glut_Project
+📦 Night_Highway_Patrol_Glut_Project_VSCode
 ├── 🛠️ .vscode/
 │   ├── c_cpp_properties.json    # IntelliSense config
 │   ├── launch.json              # Debug config  
