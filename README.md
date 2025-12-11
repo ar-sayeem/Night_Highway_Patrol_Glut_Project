@@ -127,8 +127,6 @@ g++ main.cpp -o main.exe \
 
 <div align="center">
 
-**Made with ❤️ using OpenGL & C++**
-
-[⭐ Star this repo](https://github.com/ar-sayeem/Night_Highway_Patrol_Glut_Project) • [🐛 Report bugs](https://github.com/ar-sayeem/Night_Highway_Patrol_Glut_Project/issues) • [✨ Request features](https://github.com/ar-sayeem/Night_Highway_Patrol_Glut_Project/issues)
+**Made with ⚡ using OpenGL & C++**
 
 </div>
