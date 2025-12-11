@@ -18,6 +18,9 @@
 # Dynamic libraries
 *.dll
 *.so
+
+# Game data files
+highscore.txt
 *.dylib
 
 # Temporary files

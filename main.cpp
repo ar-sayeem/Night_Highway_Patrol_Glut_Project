@@ -11,6 +11,8 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
+#include <fstream>
+#include <iostream>
 
 // Window dimensions
 const int WIDTH = 800;
@@ -35,6 +37,10 @@ const float SCORE_INTERVAL = 0.8f; // Slightly faster scoring
 
 // Track criminals caught
 int criminalsCaught = 0;
+
+// High score system
+int highScore = 0;
+const std::string HIGH_SCORE_FILE = "highscore.txt";
 
 // Civilian spawning control
 float gameTime = 0.0f;
@@ -92,6 +98,34 @@ static float randFloat(float a, float b) {
 static int randInt(int a, int b) {
     if (a > b) return a;
     return a + rand() % (b - a + 1);
+}
+
+// ==================== HIGH SCORE SYSTEM ====================
+
+void loadHighScore() {
+    std::ifstream file(HIGH_SCORE_FILE);
+    if (file.is_open()) {
+        file >> highScore;
+        file.close();
+        if (highScore < 0) highScore = 0; // Safety check
+    } else {
+        highScore = 0; // Default if file doesn't exist
+    }
+}
+
+void saveHighScore() {
+    std::ofstream file(HIGH_SCORE_FILE);
+    if (file.is_open()) {
+        file << highScore;
+        file.close();
+    }
+}
+
+void checkAndUpdateHighScore() {
+    if (score > highScore) {
+        highScore = score;
+        saveHighScore();
+    }
 }
 
 // ==================== ALGORITHM IMPLEMENTATIONS ====================
@@ -612,6 +646,12 @@ void drawUI() {
     std::string speedText = "Speed: " + std::to_string((int)(gameSpeed * 100)) + "%";
     for(char c: speedText) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
 
+    // High score (top right, below speed)
+    glColor3f(1.0f, 0.8f, 0.2f);
+    glRasterPos2i(WIDTH - 210, HEIGHT - 88);
+    std::string highScoreText = "High: " + std::to_string(highScore);
+    for(char c: highScoreText) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, c);
+
     if(paused) {
         glColor4f(0.0f, 0.0f, 0.0f, 0.7f);
         glEnable(GL_BLEND);
@@ -649,10 +689,13 @@ void drawUI() {
         std::string totalScore = "Final Score: " + std::to_string(score);
         drawCenteredText(HEIGHT/2 + 15, GLUT_BITMAP_HELVETICA_18, totalScore);
 
-        std::string caughtTotal = "Criminals Caught: " + std::to_string(criminalsCaught);
-        drawCenteredText(HEIGHT/2 - 10, GLUT_BITMAP_HELVETICA_18, caughtTotal);
+        std::string highScoreDisplay = "High Score: " + std::to_string(highScore);
+        drawCenteredText(HEIGHT/2 - 5, GLUT_BITMAP_HELVETICA_18, highScoreDisplay);
 
-        drawCenteredText(HEIGHT/2 - 45, GLUT_BITMAP_HELVETICA_18, "Press R to Restart");
+        std::string caughtTotal = "Criminals Caught: " + std::to_string(criminalsCaught);
+        drawCenteredText(HEIGHT/2 - 25, GLUT_BITMAP_HELVETICA_18, caughtTotal);
+
+        drawCenteredText(HEIGHT/2 - 60, GLUT_BITMAP_HELVETICA_18, "Press R to Restart");
     }
 }
 
@@ -882,6 +925,7 @@ void updateGame() {
     // Check if police hits road edge -> game over
     float halfw = police.width * 0.5f;
     if (police.x - halfw <= ROAD_LEFT || police.x + halfw >= ROAD_RIGHT) {
+        checkAndUpdateHighScore(); // Update high score before game over
         gameOver = true;
         return;
     }
@@ -1009,6 +1053,7 @@ void updateGame() {
         if (!car.active) continue;
         if (checkCollisionScaled(police.x, police.y, police.width, police.height,
                                  car.x, car.y, car.width, car.height)) {
+            checkAndUpdateHighScore(); // Update high score before game over
             gameOver = true;
             return;
         }
@@ -1114,6 +1159,7 @@ void init() {
     glMatrixMode(GL_MODELVIEW);
 
     srand((unsigned int)time(NULL));
+    loadHighScore(); // Load high score at startup
     initGame();
 }
 
