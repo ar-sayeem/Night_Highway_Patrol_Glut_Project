@@ -36,6 +36,12 @@ const float SCORE_INTERVAL = 0.8f; // Slightly faster scoring
 // Track criminals caught
 int criminalsCaught = 0;
 
+// Civilian spawning control
+float gameTime = 0.0f;
+float lastSpawnTime = 0.0f;
+float baseSpawnInterval = 3.0f; // Base spawn interval
+int activeCivilianCount = 0;
+
 // Base vehicle size
 const float BASE_VEH_W = 44.0f;
 const float BASE_VEH_H = 66.0f;
@@ -659,7 +665,7 @@ Car generateRandomCivilianTemplate() {
     car.type = randInt(0, 2);
     car.color = randInt(0, 4);
     car.active = true;
-
+    
     if (car.type == 0) { // Regular car
         car.width = (float)randInt(30, 42);
         car.height = (float)randInt(45, 60);
@@ -699,17 +705,14 @@ void spawnCivilianAtIndex(int idx, int tries = 50) {
     bool placed = false;
 
     while (attempt < tries && !placed) {
+        // Simple random lane selection
         int lane = randInt(0, LANE_COUNT - 1);
         car.lane = lane;
-        float jitter = randFloat(-12.0f, 12.0f);
+        float jitter = randFloat(-15.0f, 15.0f);
         car.x = laneX(lane) + jitter;
 
-        // Vary spawn distances
-        if (idx % 2 == 0) {
-            car.y = HEIGHT + 30.0f + randFloat(0.0f, 180.0f) + attempt * 35.0f;
-        } else {
-            car.y = HEIGHT + 180.0f + randFloat(0.0f, 400.0f) + attempt * 55.0f;
-        }
+        // Random spawn distance
+        car.y = HEIGHT + 100.0f + randFloat(0.0f, 400.0f) + attempt * 50.0f;
 
         if (canPlaceAt(car.x, car.y, car.width, car.height, idx)) {
             placed = true;
@@ -719,8 +722,8 @@ void spawnCivilianAtIndex(int idx, int tries = 50) {
 
     // Fallback: push higher
     if (!placed) {
-        for (int k = 0; k < 80; ++k) {
-            car.y += 65.0f;
+        for (int k = 0; k < 50; ++k) {
+            car.y += 70.0f;
             if (canPlaceAt(car.x, car.y, car.width, car.height, idx)) {
                 placed = true;
                 break;
@@ -729,6 +732,38 @@ void spawnCivilianAtIndex(int idx, int tries = 50) {
     }
 
     civilianCars[idx] = car;
+    if (placed) {
+        activeCivilianCount++;
+    }
+}
+
+// Simple civilian spawning based on police speed
+void trySpawnNewCivilian() {
+    // Calculate spawn chance based on police speed
+    float policeSpeedFactor = fabsf(police.vx) / 100.0f; // Normalize speed
+    float spawnChance = 0.02f + policeSpeedFactor * 0.03f; // Higher speed = more spawns
+    
+    // Calculate current spawn interval based on police speed
+    float currentSpawnInterval = baseSpawnInterval - policeSpeedFactor * 1.5f;
+    if (currentSpawnInterval < 0.5f) currentSpawnInterval = 0.5f; // Minimum interval
+    
+    // Check if enough time has passed since last spawn
+    if (gameTime - lastSpawnTime < currentSpawnInterval) return;
+    
+    // Check spawn chance
+    if (randFloat(0.0f, 1.0f) > spawnChance) return;
+    
+    // Limit number of active civilians (max 8)
+    if (activeCivilianCount >= 8) return;
+    
+    // Find an inactive slot and spawn
+    for (int i = 0; i < (int)civilianCars.size(); ++i) {
+        if (!civilianCars[i].active) {
+            spawnCivilianAtIndex(i, 60);
+            lastSpawnTime = gameTime;
+            return;
+        }
+    }
 }
 
 void spawnCriminalOriginal() {
@@ -758,11 +793,20 @@ void initGame() {
         laneMarkers.push_back({LANE_X[2], (float)i});
     }
 
-    // Civilian cars
+    // Civilian cars - start with fewer and let them spawn dynamically
     civilianCars.clear();
-    const int CIV_COUNT = 7;
-    civilianCars.resize(CIV_COUNT);
-    for (int i = 0; i < CIV_COUNT; ++i) {
+    const int MAX_CIV_COUNT = 12; // Maximum possible civilians
+    civilianCars.resize(MAX_CIV_COUNT);
+    
+    // Initialize all as inactive
+    for (int i = 0; i < MAX_CIV_COUNT; ++i) {
+        civilianCars[i].active = false;
+    }
+    
+    // Spawn initial civilians with more spacing
+    activeCivilianCount = 0;
+    int initialSpawns = 3 + randInt(0, 2); // 3-4 initial cars
+    for (int i = 0; i < initialSpawns; ++i) {
         spawnCivilianAtIndex(i, 50);
     }
 
@@ -797,6 +841,11 @@ void initGame() {
     gameOver = false;
     paused = false;
     gameSpeed = 1.0f;
+    
+    // Reset spawning control
+    gameTime = 0.0f;
+    lastSpawnTime = 0.0f;
+    baseSpawnInterval = 3.0f;
 }
 
 // ==================== GAME UPDATE ====================
@@ -805,6 +854,9 @@ void updateGame() {
     if (gameOver || paused) return;
 
     const float dt = 16.0f / 1000.0f;
+    
+    // Update game time
+    gameTime += dt;
 
     // Gradually increase max speed (difficulty)
     police.maxVx += 2.5f * dt * 60.0f;
@@ -903,14 +955,18 @@ void updateGame() {
         }
     }
 
-    // Respawn civilians that fell off
+    // Respawn civilians that fell off and try spawning new ones
     for (int i = 0; i < (int)civilianCars.size(); ++i) {
         Car &car = civilianCars[i];
-        if (car.y < -350.0f) {
-            spawnCivilianAtIndex(i, 40);
+        if (car.active && car.y < -350.0f) {
+            car.active = false; // Deactivate instead of immediate respawn
+            activeCivilianCount--;
             score += 10;
         }
     }
+    
+    // Try to spawn new civilians dynamically
+    trySpawnNewCivilian();
 
     // Update criminal (zigzag pattern)
     if (criminal.active) {
@@ -1006,17 +1062,21 @@ void keyboard(unsigned char key, int x, int y) {
         case 27: // ESC
             exit(0);
             break;
-        case 's':
-        case 'S':
-            police.sirenOn = !police.sirenOn;
-            break;
-        case 'p':
-        case 'P':
-            paused = !paused;
-            break;
         case 'r':
         case 'R':
             initGame();
+            break;
+        case 's':
+        case 'S':
+            if (!gameOver) {
+                police.sirenOn = !police.sirenOn;
+            }
+            break;
+        case 'p':
+        case 'P':
+            if (!gameOver) {
+                paused = !paused;
+            }
             break;
     }
 }
